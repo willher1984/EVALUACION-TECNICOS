@@ -22,6 +22,16 @@ distribucion = pd.read_excel(
     "data/DISTRIBUCION.xlsx"
 )
 
+garantias = pd.read_excel(
+    "data/GARANTIAS 2 MESES.xlsx"
+)
+
+garantias["Fecha"] = pd.to_datetime(
+    garantias["Fecha"],
+    errors="coerce"
+)
+
+
 # =========================
 # LIMPIAR CEDULAS
 # =========================
@@ -82,9 +92,30 @@ base["Fecha"] = pd.to_datetime(
     errors="coerce"
 )
 
-mes_evaluado = base["Fecha"].dt.to_period("M").mode()[0]
+mes_evaluado = base["Fecha"].dt.to_period("M").dropna().mode()[0]
 
 st.write("Mes evaluado:", mes_evaluado)
+
+
+garantias_mes = garantias[
+    garantias["Fecha"].dt.to_period("M") == mes_evaluado
+]
+
+ordenes_con_garantia = set(
+    garantias_mes["Orden Original"]
+    .astype(str)
+    .str.replace(".0", "", regex=False)
+    .str.strip()
+    .unique()
+)
+
+base["Tiene_Garantia"] = (
+    base["Orden"]
+    .astype(str)
+    .str.replace(".0", "", regex=False)
+    .str.strip()
+    .isin(ordenes_con_garantia)
+)
 
 from pandas.tseries.offsets import BDay
 
@@ -122,10 +153,23 @@ resumen = (
         Dias_Laborados=(
     "Fecha",
     lambda x: x.dt.date.nunique()
-)
+),
+
+Garantias=("Tiene_Garantia", "sum"),
+
     )
     .reset_index()
 )
+
+resumen["Falla_Joven"] = (
+    resumen["Garantias"]
+    / resumen["Completadas"]
+    * 100
+).fillna(0).round(2)
+
+resumen["Nota_Falla_Joven"] = (
+    30 * (1 - resumen["Falla_Joven"] / 100)
+).clip(lower=0).round(2)
 
 resumen["Dias_Habiles"] = dias_habiles
 
@@ -226,6 +270,8 @@ resumen["Total"] = (
     +
     resumen["Nota_Efectividad"]
     +
+    resumen["Nota_Falla_Joven"]
+    +
     resumen["Nota_Asistencia"]
 ).round(2)
 
@@ -238,6 +284,8 @@ st.dataframe(
         "VEHICULO",
         "Asignadas",
         "Completadas",
+        "Falla_Joven",
+        "Nota_Falla_Joven",
         "Productividad",
         "Nota_Productividad",
         "Efectividad",
@@ -252,8 +300,10 @@ st.dataframe(
         "Nota_Productividad": "{:.2f}",
         "Efectividad": "{:.2f}%",
         "Nota_Efectividad": "{:.2f}",
+        "Nota_Falla_Joven": "{:.2f}",
         "Asistencia": "{:.2f}%",
         "Nota_Asistencia": "{:.2f}",
+        "Falla_Joven": "{:.2f}%",
         "Total": "{:.2f}"
   })
     .set_properties(**{
