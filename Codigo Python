@@ -92,9 +92,35 @@ base["Fecha"] = pd.to_datetime(
     errors="coerce"
 )
 
-mes_evaluado = base["Fecha"].dt.to_period("M").dropna().mode()[0]
+meses = sorted(
+    base["Fecha"]
+    .dt.to_period("M")
+    .dropna()
+    .unique()
+)
+
+if len(meses) < 2:
+    st.error(
+        "El archivo Reporte_final.csv debe contener al menos dos meses de información."
+    )
+    st.stop()
+
+mes_evaluado = meses[-1]
+mes_anterior = meses[-2]
 
 st.write("Mes evaluado:", mes_evaluado)
+st.write("Mes anterior:", mes_anterior)
+
+base_actual = base[
+    base["Fecha"].dt.to_period("M") == mes_evaluado
+].copy()
+
+base_anterior = base[
+    base["Fecha"].dt.to_period("M") == mes_anterior
+].copy()
+
+st.write("Órdenes mes evaluado:", len(base_actual))
+st.write("Órdenes mes anterior:", len(base_anterior))
 
 
 garantias_mes = garantias[
@@ -109,7 +135,7 @@ ordenes_con_garantia = set(
     .unique()
 )
 
-base["Tiene_Garantia"] = (
+base_actual["Tiene_Garantia"] = (
     base["Orden"]
     .astype(str)
     .str.replace(".0", "", regex=False)
@@ -132,7 +158,7 @@ dias_habiles = len(
 
 st.write("Días hábiles del mes:", dias_habiles)
 resumen = (
-    base.groupby(
+    base_actual.groupby(
         [
             "CC Tecnico",
             "Tecnico",
@@ -309,25 +335,4 @@ st.dataframe(
     .set_properties(**{
         "color": "#111111"
     }),
-)
-# =========================
-# RESULTADOS
-# =========================
-
-st.write("Supervisor seleccionado:")
-st.success(supervisor)
-
-st.write("Registros encontrados:")
-st.write(len(base))
-
-st.dataframe(
-    base[
-        [
-            "CC Tecnico",
-            "Tecnico",
-            "SUPERVISOR",
-            "VEHICULO"
-        ]
-    ],
-    use_container_width=True
 )
