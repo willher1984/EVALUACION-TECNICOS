@@ -153,24 +153,112 @@ resumen["Cumplimiento_%"] = (
     * 100
 ).round(2)
 
+# =========================
+# INDICADORES
+# =========================
+
+resumen["Productividad"] = (
+    resumen["Completadas"]
+    /
+    resumen["Dias_Habiles"]
+).round(2)
+
+
+resumen["Efectividad"] = (
+    resumen["Completadas"]
+    /
+    resumen["Asignadas"]
+    * 100
+).round(2)
+
+
+resumen["Asistencia"] = (
+    resumen["Dias_Laborados"]
+    /
+    resumen["Dias_Habiles"]
+    * 100
+).round(2)
+
+
+# =========================
+# PUNTAJES
+# =========================
+
+def nota_productividad(row):
+
+    if "MOTO" in str(row["VEHICULO"]).upper():
+        meta = 2
+    else:
+        meta = 3.5
+
+    cumplimiento = row["Productividad"] / meta
+
+    if cumplimiento >= 1:
+        return 30
+    elif cumplimiento >= 0.85:
+        return 24
+    elif cumplimiento >= 0.70:
+        return 15
+    else:
+        return 5
+
+
+resumen["Nota_Productividad"] = resumen.apply(
+    nota_productividad,
+    axis=1
+)
+
+
+resumen["Nota_Efectividad"] = (
+    resumen["Efectividad"]
+    /100*25
+).round(2)
+
+
+resumen["Nota_Asistencia"] = (
+    resumen["Asistencia"]
+    /100*15
+).round(2)
+
+
+resumen["Total"] = (
+    resumen["Nota_Productividad"]
+    +
+    resumen["Nota_Efectividad"]
+    +
+    resumen["Nota_Asistencia"]
+).round(2)
+
 st.subheader("Resumen Técnicos")
 
 st.dataframe(
     resumen[
         [
-            "Tecnico",
-            "SUPERVISOR",
-            "VEHICULO",
-            "Dias_Laborados",
-            "Dias_Habiles",
-            "Asignadas",
-            "Completadas",
-            "Meta",
-            "Promedio_Ordenes_Dia",
-            "Cumplimiento_%"
+        "Tecnico",
+        "VEHICULO",
+        "Asignadas",
+        "Completadas",
+        "Productividad",
+        "Nota_Productividad",
+        "Efectividad",
+        "Nota_Efectividad",
+        "Asistencia",
+        "Nota_Asistencia",
+        "Total"
         ]
-    ],
-    use_container_width=True
+    ].style.format(
+    {
+        "Productividad": "{:.2f}",
+        "Nota_Productividad": "{:.2f}",
+        "Efectividad": "{:.2f}%",
+        "Nota_Efectividad": "{:.2f}",
+        "Asistencia": "{:.2f}%",
+        "Nota_Asistencia": "{:.2f}",
+        "Total": "{:.2f}"
+  })
+    .set_properties(**{
+        "color": "#111111"
+    }),
 )
 # =========================
 # RESULTADOS
