@@ -1,0 +1,195 @@
+import streamlit as st
+import pandas as pd
+
+st.set_page_config(
+    page_title="Evaluación Técnicos",
+    layout="wide"
+)
+
+st.title("📊 Evaluación de Técnicos")
+
+# =========================
+# CARGAR ARCHIVOS
+# =========================
+
+ordenes = pd.read_csv(
+    "data/Reporte_final.csv",
+    sep=";",
+    low_memory=False
+)
+
+distribucion = pd.read_excel(
+    "data/DISTRIBUCION.xlsx"
+)
+
+# =========================
+# LIMPIAR CEDULAS
+# =========================
+
+ordenes["CC Tecnico"] = (
+    ordenes["CC Tecnico"]
+    .astype(str)
+    .str.replace(".0", "", regex=False)
+    .str.replace(".", "", regex=False)
+    .str.strip()
+)
+
+distribucion["TECNICO BF"] = (
+    distribucion["TECNICO BF"]
+    .astype(str)
+    .str.replace(".0", "", regex=False)
+    .str.replace(".", "", regex=False)
+    .str.strip()
+)
+
+# =========================
+# CRUCE TECNICOS
+# =========================
+
+base = ordenes.merge(
+    distribucion,
+    left_on="CC Tecnico",
+    right_on="TECNICO BF",
+    how="left"
+)
+
+# =========================
+# FILTRO SUPERVISOR
+# =========================
+
+supervisores = sorted(
+    distribucion["SUPERVISOR"]
+    .dropna()
+    .unique()
+)
+
+supervisor = st.selectbox(
+    "Supervisor",
+    ["TODOS"] + list(supervisores)
+)
+
+if supervisor != "TODOS":
+    base = base[
+        base["SUPERVISOR"] == supervisor
+    ]
+
+# =========================
+# RESUMEN TECNICOS
+# =========================
+
+base["Fecha"] = pd.to_datetime(
+    base["Fecha"],
+    errors="coerce"
+)
+
+mes_evaluado = base["Fecha"].dt.to_period("M").mode()[0]
+
+st.write("Mes evaluado:", mes_evaluado)
+
+from pandas.tseries.offsets import BDay
+
+inicio_mes = mes_evaluado.start_time
+fin_mes = mes_evaluado.end_time
+
+dias_habiles = len(
+    pd.date_range(
+        inicio_mes,
+        fin_mes,
+        freq=BDay()
+    )
+)
+
+st.write("Días hábiles del mes:", dias_habiles)
+resumen = (
+    base.groupby(
+        [
+            "CC Tecnico",
+            "Tecnico",
+            "SUPERVISOR",
+            "VEHICULO"
+        ],
+        dropna=False
+    )
+    .agg(
+        Asignadas=("Orden", "count"),
+        Completadas=(
+            "Estado",
+            lambda x: (x.astype(str)
+                        .str.upper()
+                        .str.contains("COMPLET"))
+                        .sum()
+        ),
+        Dias_Laborados=(
+    "Fecha",
+    lambda x: x.dt.date.nunique()
+)
+    )
+    .reset_index()
+)
+
+resumen["Dias_Habiles"] = dias_habiles
+
+def calcular_meta(vehiculo):
+
+    vehiculo = str(vehiculo).upper()
+
+    if "MOTO" in vehiculo:
+        return dias_habiles * 2
+
+    return dias_habiles * 3.5
+
+resumen["Meta"] = resumen["VEHICULO"].apply(
+    calcular_meta
+)
+
+resumen["Promedio_Ordenes_Dia"] = (
+    resumen["Completadas"]
+    / resumen["Dias_Laborados"]
+)
+
+resumen["Cumplimiento_%"] = (
+    resumen["Completadas"]
+    / resumen["Meta"]
+    * 100
+).round(2)
+
+st.subheader("Resumen Técnicos")
+
+st.dataframe(
+    resumen[
+        [
+            "Tecnico",
+            "SUPERVISOR",
+            "VEHICULO",
+            "Dias_Laborados",
+            "Dias_Habiles",
+            "Asignadas",
+            "Completadas",
+            "Meta",
+            "Promedio_Ordenes_Dia",
+            "Cumplimiento_%"
+        ]
+    ],
+    use_container_width=True
+)
+# =========================
+# RESULTADOS
+# =========================
+
+st.write("Supervisor seleccionado:")
+st.success(supervisor)
+
+st.write("Registros encontrados:")
+st.write(len(base))
+
+st.dataframe(
+    base[
+        [
+            "CC Tecnico",
+            "Tecnico",
+            "SUPERVISOR",
+            "VEHICULO"
+        ]
+    ],
+    use_container_width=True
+)
