@@ -120,6 +120,8 @@ base_anterior = base[
     base["Fecha"].dt.to_period("M") == mes_anterior
 ].copy()
 
+
+
 st.write("Órdenes mes evaluado:", len(base_actual))
 st.write("Órdenes mes anterior:", len(base_anterior))
 
@@ -138,187 +140,31 @@ resumen_anterior = calcular_resumen(
 st.write("Técnicos mes evaluado:", len(resumen_actual))
 st.write("Técnicos mes anterior:", len(resumen_anterior))
 
-
-
-
-garantias_mes = garantias[
-    garantias["Fecha"].dt.to_period("M") == mes_evaluado
-]
-
-ordenes_con_garantia = set(
-    garantias_mes["Orden Original"]
-    .astype(str)
-    .str.replace(".0", "", regex=False)
-    .str.strip()
-    .unique()
+st.write(
+    "Días hábiles mes evaluado:",
+    resumen_actual["Dias_Habiles"].iloc[0]
 )
 
-base_actual["Tiene_Garantia"] = (
-    base["Orden"]
-    .astype(str)
-    .str.replace(".0", "", regex=False)
-    .str.strip()
-    .isin(ordenes_con_garantia)
+st.write(
+    "Días hábiles mes anterior:",
+    resumen_anterior["Dias_Habiles"].iloc[0]
 )
 
-from pandas.tseries.offsets import BDay
 
-inicio_mes = mes_evaluado.start_time
-fin_mes = mes_evaluado.end_time
+def color_total(valor):
 
-dias_habiles = len(
-    pd.date_range(
-        inicio_mes,
-        fin_mes,
-        freq=BDay()
-    )
-)
+    if valor >= 90:
+        return "background-color: #C6EFCE; color: black"
 
-st.write("Días hábiles del mes:", dias_habiles)
-resumen = (
-    base_actual.groupby(
-        [
-            "CC Tecnico",
-            "Tecnico",
-            "SUPERVISOR",
-            "VEHICULO"
-        ],
-        dropna=False
-    )
-    .agg(
-        Asignadas=("Orden", "count"),
-        Completadas=(
-            "Estado",
-            lambda x: (x.astype(str)
-                        .str.upper()
-                        .str.contains("COMPLET"))
-                        .sum()
-        ),
-        Dias_Laborados=(
-    "Fecha",
-    lambda x: x.dt.date.nunique()
-),
+    elif valor >= 80:
+        return "background-color: #FFEB9C; color: black"
 
-Garantias=("Tiene_Garantia", "sum"),
+    elif valor >= 70:
+        return "background-color: #F4B084; color: black"
 
-    )
-    .reset_index()
-)
-
-resumen["Falla_Joven"] = (
-    resumen["Garantias"]
-    / resumen["Completadas"]
-    * 100
-).fillna(0).round(2)
-
-resumen["Nota_Falla_Joven"] = (
-    30 * (1 - resumen["Falla_Joven"] / 100)
-).clip(lower=0).round(2)
-
-resumen["Dias_Habiles"] = dias_habiles
-
-def calcular_meta(vehiculo):
-
-    vehiculo = str(vehiculo).upper()
-
-    if "MOTO" in vehiculo:
-        return dias_habiles * 2
-
-    return dias_habiles * 3.5
-
-resumen["Meta"] = resumen["VEHICULO"].apply(
-    calcular_meta
-)
-
-resumen["Promedio_Ordenes_Dia"] = (
-    resumen["Completadas"]
-    / resumen["Dias_Laborados"]
-)
-
-resumen["Cumplimiento_%"] = (
-    resumen["Completadas"]
-    / resumen["Meta"]
-    * 100
-).round(2)
-
-# =========================
-# INDICADORES
-# =========================
-
-resumen["Productividad"] = (
-    resumen["Completadas"]
-    /
-    resumen["Dias_Habiles"]
-).round(2)
-
-
-resumen["Efectividad"] = (
-    resumen["Completadas"]
-    /
-    resumen["Asignadas"]
-    * 100
-).round(2)
-
-
-resumen["Asistencia"] = (
-    resumen["Dias_Laborados"]
-    /
-    resumen["Dias_Habiles"]
-    * 100
-).round(2)
-
-
-# =========================
-# PUNTAJES
-# =========================
-
-def nota_productividad(row):
-
-    if "MOTO" in str(row["VEHICULO"]).upper():
-        meta = 2
     else:
-        meta = 3.5
-
-    cumplimiento = row["Productividad"] / meta
-
-    if cumplimiento >= 1:
-        return 30
-    elif cumplimiento >= 0.85:
-        return 24
-    elif cumplimiento >= 0.70:
-        return 15
-    else:
-        return 5
-
-
-resumen["Nota_Productividad"] = resumen.apply(
-    nota_productividad,
-    axis=1
-)
-
-
-resumen["Nota_Efectividad"] = (
-    resumen["Efectividad"]
-    /100*25
-).round(2)
-
-
-resumen["Nota_Asistencia"] = (
-    resumen["Asistencia"]
-    /100*15
-).round(2)
-
-
-resumen["Total"] = (
-    resumen["Nota_Productividad"]
-    +
-    resumen["Nota_Efectividad"]
-    +
-    resumen["Nota_Falla_Joven"]
-    +
-    resumen["Nota_Asistencia"]
-).round(2)
-
+        return "background-color: #F8CBAD; color: black"
+    
 st.subheader("Resumen Técnicos")
 
 st.dataframe(
@@ -338,7 +184,7 @@ st.dataframe(
         "Nota_Asistencia",
         "Total"
         ]
-    ].style.format(
+  ].style.format(
     {
         "Productividad": "{:.2f}",
         "Nota_Productividad": "{:.2f}",
@@ -349,10 +195,13 @@ st.dataframe(
         "Nota_Asistencia": "{:.2f}",
         "Falla_Joven": "{:.2f}%",
         "Total": "{:.2f}"
-  })
-        .set_properties(**{
-        "color": "#111111"
-    }),
+    }
+).applymap(
+    color_total,
+    subset=["Total"]
+).set_properties(**{
+    "color": "#111111"
+}),
     use_container_width=True,
     hide_index=True,
     column_config={
@@ -393,9 +242,12 @@ st.dataframe(
             "Falla_Joven": "{:.2f}%",
             "Total": "{:.2f}"
         }
-    )    .set_properties(**{
-        "color": "#111111"
-    }),
+ ).applymap(
+    color_total,
+    subset=["Total"]
+).set_properties(**{
+    "color": "#111111"
+}),
     use_container_width=True,
     hide_index=True,
     column_config={
@@ -442,22 +294,83 @@ comparativo["Δ Asistencia"] = (
     - comparativo["Asistencia_Anterior"].fillna(0)
 ).round(2)
 
+def color_delta(valor):
+    if valor > 0:
+        return "🟢"
+    elif valor < 0:
+        return "🔴"
+    else:
+        return "🟡"
+
+
+def color_falla(valor):
+    # En falla joven disminuir es bueno
+    if valor < 0:
+        return "🟢"
+    elif valor > 0:
+        return "🔴"
+    else:
+        return "🟡"
+comparativo["Prod"] = (
+    comparativo["Δ Productividad"]
+    .apply(color_delta)
+    + " "
+    + comparativo["Δ Productividad"].astype(str)
+)
+
+comparativo["Efec"] = (
+    comparativo["Δ Efectividad"]
+    .apply(color_delta)
+    + " "
+    + comparativo["Δ Efectividad"].astype(str)
+)
+
+comparativo["FJ"] = (
+    comparativo["Δ Falla_Joven"]
+    .apply(color_falla)
+    + " "
+    + comparativo["Δ Falla_Joven"].astype(str)
+)
+
+comparativo["Asist"] = (
+    comparativo["Δ Asistencia"]
+    .apply(color_delta)
+    + " "
+    + comparativo["Δ Asistencia"].astype(str)
+)
+
+comparativo["Total Comp"] = (
+    comparativo["Δ Total"]
+    .apply(color_delta)
+    + " "
+    + comparativo["Δ Total"].astype(str)
+)
+
+
 st.subheader("Comparativo")
 
 st.dataframe(
     comparativo[
-    [
-        "Tecnico",
-        "Δ Productividad",
-        "Δ Efectividad",
-        "Δ Falla_Joven",
-        "Δ Asistencia",
-        "Δ Total"
-    ]
-].rename(
-        columns={
-            "Tecnico_Actual": "Tecnico"
-        }
-    ),
-    use_container_width=True
+        [
+            "Tecnico",
+            "Prod",
+            "Efec",
+            "FJ",
+            "Asist",
+            "Total Comp"
+        ]
+    ],
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Tecnico": st.column_config.TextColumn(
+            "Técnico",
+            pinned=True
+        ),
+        "Prod": "Δ Productividad",
+        "Efec": "Δ Efectividad",
+        "FJ": "Δ Falla Joven",
+        "Asist": "Δ Asistencia",
+        "Total Comp": "Δ Total"
+    }
 )
