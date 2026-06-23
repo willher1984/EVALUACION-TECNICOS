@@ -1,463 +1,162 @@
-import streamlit as st
 import pandas as pd
-from calculos import calcular_resumen
-
-st.set_page_config(
-    page_title="Evaluación Técnicos",
-    layout="wide"
-)
-
-st.title("📊 Evaluación de Técnicos")
-
-# =========================
-# CARGAR ARCHIVOS
-# =========================
-
-ordenes = pd.read_csv(
-    "data/Reporte_final.csv",
-    sep=";",
-    low_memory=False
-)
-
-distribucion = pd.read_excel(
-    "data/DISTRIBUCION.xlsx"
-)
-
-garantias = pd.read_excel(
-    "data/GARANTIAS 2 MESES.xlsx"
-)
-
-garantias["Fecha"] = pd.to_datetime(
-    garantias["Fecha"],
-    errors="coerce"
-)
-
-
-# =========================
-# LIMPIAR CEDULAS
-# =========================
-
-ordenes["CC Tecnico"] = (
-    ordenes["CC Tecnico"]
-    .astype(str)
-    .str.replace(".0", "", regex=False)
-    .str.replace(".", "", regex=False)
-    .str.strip()
-)
-
-distribucion["TECNICO BF"] = (
-    distribucion["TECNICO BF"]
-    .astype(str)
-    .str.replace(".0", "", regex=False)
-    .str.replace(".", "", regex=False)
-    .str.strip()
-)
-
-# =========================
-# CRUCE TECNICOS
-# =========================
-
-base = ordenes.merge(
-    distribucion,
-    left_on="CC Tecnico",
-    right_on="TECNICO BF",
-    how="left"
-)
-
-# =========================
-# FILTRO SUPERVISOR
-# =========================
-
-supervisores = sorted(
-    distribucion["SUPERVISOR"]
-    .dropna()
-    .unique()
-)
-
-supervisor = st.selectbox(
-    "Supervisor",
-    ["TODOS"] + list(supervisores)
-)
-
-if supervisor != "TODOS":
-    base = base[
-        base["SUPERVISOR"] == supervisor
-    ]
-
-# =========================
-# RESUMEN TECNICOS
-# =========================
-
-base["Fecha"] = pd.to_datetime(
-    base["Fecha"],
-    errors="coerce"
-)
-
-meses = sorted(
-    base["Fecha"]
-    .dt.to_period("M")
-    .dropna()
-    .unique()
-)
-
-if len(meses) < 2:
-    st.error(
-        "El archivo Reporte_final.csv debe contener al menos dos meses de información."
-    )
-    st.stop()
-
-mes_evaluado = meses[-1]
-mes_anterior = meses[-2]
-
-st.write("Mes evaluado:", mes_evaluado)
-st.write("Mes anterior:", mes_anterior)
-
-base_actual = base[
-    base["Fecha"].dt.to_period("M") == mes_evaluado
-].copy()
-
-base_anterior = base[
-    base["Fecha"].dt.to_period("M") == mes_anterior
-].copy()
-
-st.write("Órdenes mes evaluado:", len(base_actual))
-st.write("Órdenes mes anterior:", len(base_anterior))
-
-resumen_actual = calcular_resumen(
-    base_actual,
-    garantias,
-    mes_evaluado
-)
-
-resumen_anterior = calcular_resumen(
-    base_anterior,
-    garantias,
-    mes_anterior
-)
-
-st.write("Técnicos mes evaluado:", len(resumen_actual))
-st.write("Técnicos mes anterior:", len(resumen_anterior))
-
-
-
-
-garantias_mes = garantias[
-    garantias["Fecha"].dt.to_period("M") == mes_evaluado
-]
-
-ordenes_con_garantia = set(
-    garantias_mes["Orden Original"]
-    .astype(str)
-    .str.replace(".0", "", regex=False)
-    .str.strip()
-    .unique()
-)
-
-base_actual["Tiene_Garantia"] = (
-    base["Orden"]
-    .astype(str)
-    .str.replace(".0", "", regex=False)
-    .str.strip()
-    .isin(ordenes_con_garantia)
-)
-
 from pandas.tseries.offsets import BDay
 
-inicio_mes = mes_evaluado.start_time
-fin_mes = mes_evaluado.end_time
 
-dias_habiles = len(
-    pd.date_range(
-        inicio_mes,
-        fin_mes,
-        freq=BDay()
-    )
-)
+def calcular_resumen(base_mes, garantias, periodo):
 
-st.write("Días hábiles del mes:", dias_habiles)
-resumen = (
-    base_actual.groupby(
-        [
-            "CC Tecnico",
-            "Tecnico",
-            "SUPERVISOR",
-            "VEHICULO"
-        ],
-        dropna=False
-    )
-    .agg(
-        Asignadas=("Orden", "count"),
-        Completadas=(
-            "Estado",
-            lambda x: (x.astype(str)
-                        .str.upper()
-                        .str.contains("COMPLET"))
-                        .sum()
-        ),
-        Dias_Laborados=(
-    "Fecha",
-    lambda x: x.dt.date.nunique()
-),
-
-Garantias=("Tiene_Garantia", "sum"),
-
-    )
-    .reset_index()
-)
-
-resumen["Falla_Joven"] = (
-    resumen["Garantias"]
-    / resumen["Completadas"]
-    * 100
-).fillna(0).round(2)
-
-resumen["Nota_Falla_Joven"] = (
-    30 * (1 - resumen["Falla_Joven"] / 100)
-).clip(lower=0).round(2)
-
-resumen["Dias_Habiles"] = dias_habiles
-
-def calcular_meta(vehiculo):
-
-    vehiculo = str(vehiculo).upper()
-
-    if "MOTO" in vehiculo:
-        return dias_habiles * 2
-
-    return dias_habiles * 3.5
-
-resumen["Meta"] = resumen["VEHICULO"].apply(
-    calcular_meta
-)
-
-resumen["Promedio_Ordenes_Dia"] = (
-    resumen["Completadas"]
-    / resumen["Dias_Laborados"]
-)
-
-resumen["Cumplimiento_%"] = (
-    resumen["Completadas"]
-    / resumen["Meta"]
-    * 100
-).round(2)
-
-# =========================
-# INDICADORES
-# =========================
-
-resumen["Productividad"] = (
-    resumen["Completadas"]
-    /
-    resumen["Dias_Habiles"]
-).round(2)
-
-
-resumen["Efectividad"] = (
-    resumen["Completadas"]
-    /
-    resumen["Asignadas"]
-    * 100
-).round(2)
-
-
-resumen["Asistencia"] = (
-    resumen["Dias_Laborados"]
-    /
-    resumen["Dias_Habiles"]
-    * 100
-).round(2)
-
-
-# =========================
-# PUNTAJES
-# =========================
-
-def nota_productividad(row):
-
-    if "MOTO" in str(row["VEHICULO"]).upper():
-        meta = 2
-    else:
-        meta = 3.5
-
-    cumplimiento = row["Productividad"] / meta
-
-    if cumplimiento >= 1:
-        return 30
-    elif cumplimiento >= 0.85:
-        return 24
-    elif cumplimiento >= 0.70:
-        return 15
-    else:
-        return 5
-
-
-resumen["Nota_Productividad"] = resumen.apply(
-    nota_productividad,
-    axis=1
-)
-
-
-resumen["Nota_Efectividad"] = (
-    resumen["Efectividad"]
-    /100*25
-).round(2)
-
-
-resumen["Nota_Asistencia"] = (
-    resumen["Asistencia"]
-    /100*15
-).round(2)
-
-
-resumen["Total"] = (
-    resumen["Nota_Productividad"]
-    +
-    resumen["Nota_Efectividad"]
-    +
-    resumen["Nota_Falla_Joven"]
-    +
-    resumen["Nota_Asistencia"]
-).round(2)
-
-st.subheader("Resumen Técnicos")
-
-st.dataframe(
-    resumen_actual[
-        [
-        "Tecnico",
-        "VEHICULO",
-        "Asignadas",
-        "Completadas",
-        "Falla_Joven",
-        "Nota_Falla_Joven",
-        "Productividad",
-        "Nota_Productividad",
-        "Efectividad",
-        "Nota_Efectividad",
-        "Asistencia",
-        "Nota_Asistencia",
-        "Total"
-        ]
-    ].style.format(
-    {
-        "Productividad": "{:.2f}",
-        "Nota_Productividad": "{:.2f}",
-        "Efectividad": "{:.2f}%",
-        "Nota_Efectividad": "{:.2f}",
-        "Nota_Falla_Joven": "{:.2f}",
-        "Asistencia": "{:.2f}%",
-        "Nota_Asistencia": "{:.2f}",
-        "Falla_Joven": "{:.2f}%",
-        "Total": "{:.2f}"
-  })
-        .set_properties(**{
-        "color": "#111111"
-    }),
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "Tecnico": st.column_config.TextColumn(
-            "Técnico",
-            pinned=True
-        )
-    }
-)
-st.subheader("Mes Anterior")
-
-st.dataframe(
-    resumen_anterior[
-        [
-            "Tecnico",
-            "VEHICULO",
-            "Asignadas",
-            "Completadas",
-            "Falla_Joven",
-            "Nota_Falla_Joven",
-            "Productividad",
-            "Nota_Productividad",
-            "Efectividad",
-            "Nota_Efectividad",
-            "Asistencia",
-            "Nota_Asistencia",
-            "Total"
-        ]
-    ].style.format(
-        {
-            "Productividad": "{:.2f}",
-            "Nota_Productividad": "{:.2f}",
-            "Efectividad": "{:.2f}%",
-            "Nota_Efectividad": "{:.2f}",
-            "Nota_Falla_Joven": "{:.2f}",
-            "Asistencia": "{:.2f}%",
-            "Nota_Asistencia": "{:.2f}",
-            "Falla_Joven": "{:.2f}%",
-            "Total": "{:.2f}"
-        }
-    )    .set_properties(**{
-        "color": "#111111"
-    }),
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "Tecnico": st.column_config.TextColumn(
-            "Técnico",
-            pinned=True
-        )
-    }
-)
-comparativo = resumen_actual.merge(
-    resumen_anterior,
-    on="CC Tecnico",
-    how="outer",
-    suffixes=("_Actual", "_Anterior")
-)
-
-comparativo["Tecnico"] = (
-    comparativo["Tecnico_Actual"]
-    .fillna(comparativo["Tecnico_Anterior"])
-)
-
-comparativo["Δ Total"] = (
-    comparativo["Total_Actual"].fillna(0)
-    - comparativo["Total_Anterior"].fillna(0)
-).round(2)
-
-comparativo["Δ Productividad"] = (
-    comparativo["Productividad_Actual"].fillna(0)
-    - comparativo["Productividad_Anterior"].fillna(0)
-).round(2)
-
-comparativo["Δ Efectividad"] = (
-    comparativo["Efectividad_Actual"].fillna(0)
-    - comparativo["Efectividad_Anterior"].fillna(0)
-).round(2)
-
-comparativo["Δ Falla_Joven"] = (
-    comparativo["Falla_Joven_Actual"].fillna(0)
-    - comparativo["Falla_Joven_Anterior"].fillna(0)
-).round(2)
-
-comparativo["Δ Asistencia"] = (
-    comparativo["Asistencia_Actual"].fillna(0)
-    - comparativo["Asistencia_Anterior"].fillna(0)
-).round(2)
-
-st.subheader("Comparativo")
-
-st.dataframe(
-    comparativo[
-    [
-        "Tecnico",
-        "Δ Productividad",
-        "Δ Efectividad",
-        "Δ Falla_Joven",
-        "Δ Asistencia",
-        "Δ Total"
+    garantias_mes = garantias[
+        garantias["Fecha"].dt.to_period("M") == periodo
     ]
-].rename(
-        columns={
-            "Tecnico_Actual": "Tecnico"
-        }
-    ),
-    use_container_width=True
-)
+
+    ordenes_con_garantia = set(
+        garantias_mes["Orden Original"]
+        .astype(str)
+        .str.replace(".0", "", regex=False)
+        .str.strip()
+        .unique()
+    )
+
+    base_mes = base_mes.copy()
+
+    base_mes["Tiene_Garantia"] = (
+        base_mes["Orden"]
+        .astype(str)
+        .str.replace(".0", "", regex=False)
+        .str.strip()
+        .isin(ordenes_con_garantia)
+    )
+
+    inicio_mes = periodo.start_time
+
+    
+
+    ultima_fecha = base_mes["Fecha"].max()
+
+    if ultima_fecha.to_period("M") == periodo:
+        fin_mes = ultima_fecha
+    else:
+        fin_mes = periodo.end_time
+
+    dias_habiles = len(
+        pd.date_range(
+            inicio_mes,
+            fin_mes,
+            freq=BDay()
+        )
+    )
+
+    resumen = (
+        base_mes.groupby(
+            [
+                "CC Tecnico",
+                "Tecnico",
+                "SUPERVISOR",
+                "VEHICULO"
+            ],
+            dropna=False
+        )
+        .agg(
+            Asignadas=("Orden", "count"),
+
+            Completadas=(
+                "Estado",
+                lambda x: (
+                    x.astype(str)
+                    .str.upper()
+                    .str.contains("COMPLET")
+                ).sum()
+            ),
+
+            Dias_Laborados=(
+                "Fecha",
+                lambda x: x.dt.date.nunique()
+            ),
+
+            Garantias=("Tiene_Garantia", "sum"),
+        )
+        .reset_index()
+    )
+
+    resumen["Falla_Joven"] = (
+        resumen["Garantias"]
+        / resumen["Completadas"]
+        * 100
+    ).fillna(0).round(2)
+
+    resumen["Nota_Falla_Joven"] = (
+        30 * (1 - resumen["Falla_Joven"] / 100)
+    ).clip(lower=0).round(2)
+
+    resumen["Dias_Habiles"] = dias_habiles
+
+    def calcular_meta(vehiculo):
+
+        vehiculo = str(vehiculo).upper()
+
+        if "MOTO" in vehiculo:
+            return dias_habiles * 2
+
+        return dias_habiles * 3.5
+
+    resumen["Meta"] = resumen["VEHICULO"].apply(
+        calcular_meta
+    )
+
+    resumen["Productividad"] = (
+        resumen["Completadas"]
+        / resumen["Dias_Habiles"]
+    ).round(2)
+
+    resumen["Efectividad"] = (
+        resumen["Completadas"]
+        / resumen["Asignadas"]
+        * 100
+    ).round(2)
+
+    resumen["Asistencia"] = (
+        resumen["Dias_Laborados"]
+        / resumen["Dias_Habiles"]
+        * 100
+    ).round(2)
+
+    def nota_productividad(row):
+
+        if "MOTO" in str(row["VEHICULO"]).upper():
+            meta = 2
+        else:
+            meta = 3.5
+
+        cumplimiento = row["Productividad"] / meta
+
+        if cumplimiento >= 1:
+            return 30
+        elif cumplimiento >= 0.85:
+            return 24
+        elif cumplimiento >= 0.70:
+            return 15
+        else:
+            return 5
+
+    resumen["Nota_Productividad"] = resumen.apply(
+        nota_productividad,
+        axis=1
+    )
+
+    resumen["Nota_Efectividad"] = (
+        resumen["Efectividad"]
+        / 100 * 25
+    ).round(2)
+
+    resumen["Nota_Asistencia"] = (
+        resumen["Asistencia"]
+        / 100 * 15
+    ).round(2)
+
+    resumen["Total"] = (
+        resumen["Nota_Productividad"]
+        + resumen["Nota_Efectividad"]
+        + resumen["Nota_Falla_Joven"]
+        + resumen["Nota_Asistencia"]
+    ).round(2)
+
+    return resumen
