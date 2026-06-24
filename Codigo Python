@@ -275,76 +275,33 @@ comparativo["Δ Total"] = (
 ).round(2)
 
 comparativo["Δ Productividad"] = (
-    comparativo["Productividad_Actual"].fillna(0)
-    - comparativo["Productividad_Anterior"].fillna(0)
+    comparativo["Nota_Productividad_Actual"].fillna(0)
+    - comparativo["Nota_Productividad_Anterior"].fillna(0)
 ).round(2)
 
 comparativo["Δ Efectividad"] = (
-    comparativo["Efectividad_Actual"].fillna(0)
-    - comparativo["Efectividad_Anterior"].fillna(0)
+    comparativo["Nota_Efectividad_Actual"].fillna(0)
+    - comparativo["Nota_Efectividad_Anterior"].fillna(0)
 ).round(2)
 
 comparativo["Δ Falla_Joven"] = (
-    comparativo["Falla_Joven_Actual"].fillna(0)
-    - comparativo["Falla_Joven_Anterior"].fillna(0)
+    comparativo["Nota_Falla_Joven_Actual"].fillna(0)
+    - comparativo["Nota_Falla_Joven_Anterior"].fillna(0)
 ).round(2)
 
 comparativo["Δ Asistencia"] = (
-    comparativo["Asistencia_Actual"].fillna(0)
-    - comparativo["Asistencia_Anterior"].fillna(0)
+    comparativo["Nota_Asistencia_Actual"].fillna(0)
+    - comparativo["Nota_Asistencia_Anterior"].fillna(0)
 ).round(2)
 
-def color_delta(valor):
+def color_comparativo(valor):
     if valor > 0:
-        return "🟢"
+        return "background-color: #C6EFCE; color: black"
     elif valor < 0:
-        return "🔴"
+        return "background-color: #FFC7CE; color: black"
     else:
-        return "🟡"
+        return "background-color: #FFEB9C; color: black"
 
-
-def color_falla(valor):
-    # En falla joven disminuir es bueno
-    if valor < 0:
-        return "🟢"
-    elif valor > 0:
-        return "🔴"
-    else:
-        return "🟡"
-comparativo["Prod"] = (
-    comparativo["Δ Productividad"]
-    .apply(color_delta)
-    + " "
-    + comparativo["Δ Productividad"].astype(str)
-)
-
-comparativo["Efec"] = (
-    comparativo["Δ Efectividad"]
-    .apply(color_delta)
-    + " "
-    + comparativo["Δ Efectividad"].astype(str)
-)
-
-comparativo["FJ"] = (
-    comparativo["Δ Falla_Joven"]
-    .apply(color_falla)
-    + " "
-    + comparativo["Δ Falla_Joven"].astype(str)
-)
-
-comparativo["Asist"] = (
-    comparativo["Δ Asistencia"]
-    .apply(color_delta)
-    + " "
-    + comparativo["Δ Asistencia"].astype(str)
-)
-
-comparativo["Total Comp"] = (
-    comparativo["Δ Total"]
-    .apply(color_delta)
-    + " "
-    + comparativo["Δ Total"].astype(str)
-)
 
 
 st.subheader("Comparativo")
@@ -353,24 +310,37 @@ st.dataframe(
     comparativo[
         [
             "Tecnico",
-            "Prod",
-            "Efec",
-            "FJ",
-            "Asist",
-            "Total Comp"
+            "Δ Productividad",
+            "Δ Efectividad",
+            "Δ Falla_Joven",
+            "Δ Asistencia",
+            "Δ Total"
         ]
-    ],
+    ]
+    .style
+    .format({
+        "Δ Productividad": "{:.2f}",
+        "Δ Efectividad": "{:.2f}",
+        "Δ Falla_Joven": "{:.2f}",
+        "Δ Asistencia": "{:.2f}",
+        "Δ Total": "{:.2f}",
+    })
+    .applymap(
+    color_comparativo,
+    subset=[
+        "Δ Productividad",
+        "Δ Efectividad",
+        "Δ Falla_Joven",
+        "Δ Asistencia",
+        "Δ Total"
+    ]
+),
     use_container_width=True,
     hide_index=True,
     column_config={
         "Tecnico": st.column_config.TextColumn(
             "Técnico",
             pinned=True
-        ),
-        "Prod": "Δ Productividad",
-        "Efec": "Δ Efectividad",
-        "FJ": "Δ Falla Joven",
-        "Asist": "Δ Asistencia",
-        "Total Comp": "Δ Total"
+        )
     }
 )
