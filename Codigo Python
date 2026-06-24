@@ -153,13 +153,13 @@ st.write(
 
 def color_total(valor):
 
-    if valor >= 90:
+    if valor >= 80:
         return "background-color: #C6EFCE; color: black"
 
-    elif valor >= 80:
+    elif valor >= 60:
         return "background-color: #FFEB9C; color: black"
 
-    elif valor >= 70:
+    elif valor >= 40:
         return "background-color: #F4B084; color: black"
 
     else:
