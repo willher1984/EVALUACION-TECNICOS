@@ -106,11 +106,8 @@ def calcular_resumen(base_mes, garantias, periodo):
     ).fillna(0).round(2)
 
     resumen["Nota_Falla_Joven"] = (
-        100 - resumen["Falla_Joven"]
-    ).clip(
-        lower=0,
-        upper=100
-    ).round(2)
+    100 - (resumen["Falla_Joven"] / 5 * 100)
+).clip(lower=0, upper=100).round(2)
 
     # =========================
     # DÍAS HÁBILES
@@ -176,8 +173,10 @@ def calcular_resumen(base_mes, garantias, periodo):
     ).fillna(0).round(2)
 
     resumen["Nota_Efectividad"] = (
-        resumen["Efectividad"]
-    ).round(2)
+    resumen["Efectividad"]
+    / 70
+    * 100
+).clip(lower=0, upper=100).round(2)
 
     # =========================
     # ASISTENCIA
@@ -200,10 +199,10 @@ def calcular_resumen(base_mes, garantias, periodo):
     # =========================
 
     resumen["Total"] = (
-        resumen["Nota_Productividad"] * 0.25
-        + resumen["Nota_Efectividad"] * 0.25
+        resumen["Nota_Productividad"] * 0.30
+        + resumen["Nota_Efectividad"] * 0.15
         + resumen["Nota_Asistencia"] * 0.25
-        + resumen["Nota_Falla_Joven"] * 0.25
+        + resumen["Nota_Falla_Joven"] * 0.30
     ).round(2)
 
     return resumen
