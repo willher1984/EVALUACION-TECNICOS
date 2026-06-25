@@ -1,14 +1,141 @@
 import streamlit as st
 import pandas as pd
 from calculos import calcular_resumen
+import base64
+from PIL import Image
 
 st.set_page_config(
     page_title="Evaluación Técnicos",
     layout="wide"
 )
 
-st.title("📊 Evaluación de Técnicos")
+def get_base64(file):
+    with open(file, "rb") as f:
+        return base64.b64encode(f.read()).decode()
 
+img = get_base64("images/fondo.jpg")
+
+st.markdown(
+    f"""
+    <style>
+
+    .stApp {{
+        background-image:
+        linear-gradient(rgba(255,255,255,0.70),
+                        rgba(255,255,255,0.70)),
+        url("data:image/jpg;base64,{img}");
+
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+
+    [data-testid="stHeader"] {{
+        background: rgba(0,0,0,0);
+    }}
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+logo = Image.open("images/logo_bftel.png")
+
+col_logo, col_titulo = st.columns([1,5])
+
+with col_logo:
+    st.image(logo, width=200)
+
+with col_titulo:
+
+    st.markdown(
+        """
+        <h1 style="
+        color:#003366;
+        margin-bottom:0px;
+        ">
+        Dashboard Evaluación de Técnicos
+        </h1>
+
+        <h4 style="
+        color:#0099cc;
+        margin-top:0px;
+        ">
+        BFTEL • Indicadores de Desempeño
+        </h4>
+        """,
+        unsafe_allow_html=True
+    )
+
+st.markdown(
+    """
+<style>
+
+section[data-testid="stSidebar"]{
+    background:#003B5C;
+}
+
+section[data-testid="stSidebar"] *{
+    color:white;
+}
+
+div[data-baseweb="select"] > div{
+    border-radius:12px;
+    border:2px solid #0087C8;
+    background:white;
+}
+
+[data-testid="stDataFrame"]{
+    border-radius:15px;
+    overflow:hidden;
+    border:1px solid #D9D9D9;
+    box-shadow:0px 4px 15px rgba(0,0,0,.15);
+}
+
+h1{
+    color:#003B5C;
+}
+
+h2{
+    color:#003B5C;
+}
+
+h3{
+    color:#003B5C;
+}
+
+div[data-testid="stMarkdownContainer"] h3{
+    background:#003B5C;
+    color:white;
+    padding:10px;
+    border-radius:10px;
+}
+
+.stButton>button{
+    background:#0087C8;
+    color:white;
+    border-radius:10px;
+    border:none;
+    font-weight:bold;
+}
+
+.stButton>button:hover{
+    background:#005B8A;
+    color:white;
+}
+
+[data-testid="metric-container"]{
+    border-radius:15px;
+    border:1px solid #DDD;
+    background:white;
+    box-shadow:0px 3px 10px rgba(0,0,0,.15);
+}
+
+</style>
+""",
+    unsafe_allow_html=True
+)
+    
 # =========================
 # CARGAR ARCHIVOS
 # =========================
@@ -109,9 +236,6 @@ if len(meses) < 2:
 mes_evaluado = meses[-1]
 mes_anterior = meses[-2]
 
-st.write("Mes evaluado:", mes_evaluado)
-st.write("Mes anterior:", mes_anterior)
-
 base_actual = base[
     base["Fecha"].dt.to_period("M") == mes_evaluado
 ].copy()
@@ -121,9 +245,6 @@ base_anterior = base[
 ].copy()
 
 
-
-st.write("Órdenes mes evaluado:", len(base_actual))
-st.write("Órdenes mes anterior:", len(base_anterior))
 
 resumen_actual = calcular_resumen(
     base_actual,
@@ -136,19 +257,37 @@ resumen_anterior = calcular_resumen(
     garantias,
     mes_anterior
 )
+col1, col2, col3, col4, col5 = st.columns(5)
 
-st.write("Técnicos mes evaluado:", len(resumen_actual))
-st.write("Técnicos mes anterior:", len(resumen_anterior))
+with col1:
+    st.metric(
+        "📅 Mes",
+        str(mes_evaluado)
+    )
 
-st.write(
-    "Días hábiles mes evaluado:",
-    resumen_actual["Dias_Habiles"].iloc[0]
-)
+with col2:
+    st.metric(
+        "👨‍🔧 Técnicos",
+        len(resumen_actual)
+    )
 
-st.write(
-    "Días hábiles mes anterior:",
-    resumen_anterior["Dias_Habiles"].iloc[0]
-)
+with col3:
+    st.metric(
+        "📄 Órdenes",
+        len(base_actual)
+    )
+
+with col4:
+    st.metric(
+        "📆 Días Hábiles",
+        int(resumen_actual["Dias_Habiles"].iloc[0])
+    )
+
+with col5:
+    st.metric(
+        "⭐ Promedio",
+        round(resumen_actual["Total"].mean(), 2)
+    )
 
 
 def color_total(valor):
@@ -174,6 +313,7 @@ st.dataframe(
         "VEHICULO",
         "Asignadas",
         "Completadas",
+        "Garantias",
         "Falla_Joven",
         "Nota_Falla_Joven",
         "Productividad",
@@ -220,6 +360,7 @@ st.dataframe(
             "VEHICULO",
             "Asignadas",
             "Completadas",
+            "Garantias",
             "Falla_Joven",
             "Nota_Falla_Joven",
             "Productividad",
