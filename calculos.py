@@ -145,20 +145,76 @@ def calcular_resumen(base_mes, garantias, periodo):
     # =========================
     # Órdenes promedio por día
 
+        # =========================
+    # PRODUCTIVIDAD
+    # =========================
+
     resumen["Productividad"] = (
         resumen["Completadas"]
         / resumen["Dias_Habiles"]
     ).fillna(0).round(2)
 
-    # Nota Productividad sobre 100
-
-    resumen["Nota_Productividad"] = (
+    resumen["Cumplimiento_Meta"] = (
         resumen["Completadas"]
         / resumen["Meta"]
         * 100
-    ).clip(
-        upper=100
-    ).fillna(0).round(2)
+    ).fillna(0)
+
+    max_carro = resumen.loc[
+        ~resumen["VEHICULO"]
+        .astype(str)
+        .str.upper()
+        .str.contains("MOTO"),
+        "Completadas"
+    ].max()
+
+    max_moto = resumen.loc[
+        resumen["VEHICULO"]
+        .astype(str)
+        .str.upper()
+        .str.contains("MOTO"),
+        "Completadas"
+    ].max()
+
+    def calcular_nota_productividad(row):
+
+        es_moto = (
+            "MOTO"
+            in str(row["VEHICULO"]).upper()
+        )
+
+        meta = row["Meta"]
+        realizadas = row["Completadas"]
+
+        if realizadas <= meta:
+            return round(
+                (realizadas / meta) * 80,
+                2
+            )
+
+        if es_moto:
+            maximo = max_moto
+        else:
+            maximo = max_carro
+
+        if pd.isna(maximo) or maximo <= meta:
+            return 100
+
+        nota = 80 + (
+            (realizadas - meta)
+            / (maximo - meta)
+            * 20
+        )
+
+        return round(
+            min(nota, 100),
+            2
+        )
+
+    resumen["Nota_Productividad"] = resumen.apply(
+        calcular_nota_productividad,
+        axis=1
+    )
 
     # =========================
     # EFECTIVIDAD
@@ -199,10 +255,10 @@ def calcular_resumen(base_mes, garantias, periodo):
     # =========================
 
     resumen["Total"] = (
-        resumen["Nota_Productividad"] * 0.30
+        resumen["Nota_Productividad"] * 0.35
         + resumen["Nota_Efectividad"] * 0.15
         + resumen["Nota_Asistencia"] * 0.25
-        + resumen["Nota_Falla_Joven"] * 0.30
+        + resumen["Nota_Falla_Joven"] * 0.25
     ).round(2)
 
     return resumen
