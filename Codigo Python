@@ -87,7 +87,6 @@ div[data-baseweb="select"] > div{
 
 [data-testid="stDataFrame"]{
     border-radius:15px;
-    overflow:hidden;
     border:1px solid #D9D9D9;
     box-shadow:0px 4px 15px rgba(0,0,0,.15);
 }
@@ -257,7 +256,11 @@ resumen_anterior = calcular_resumen(
     garantias,
     mes_anterior
 )
-col1, col2, col3, col4, col5 = st.columns(5)
+
+st.subheader("📊 Indicadores Generales")
+
+st.markdown("### Mes Evaluado")
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
@@ -283,11 +286,35 @@ with col4:
         int(resumen_actual["Dias_Habiles"].iloc[0])
     )
 
-with col5:
+    st.markdown("### Mes Anterior")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
     st.metric(
-        "⭐ Promedio",
-        round(resumen_actual["Total"].mean(), 2)
+        "📅 Mes",
+        str(mes_anterior)
     )
+
+with col2:
+    st.metric(
+        "👨‍🔧 Técnicos",
+        len(resumen_anterior)
+    )
+
+with col3:
+    st.metric(
+        "📄 Órdenes",
+        len(base_anterior)
+    )
+
+with col4:
+    st.metric(
+        "📆 Días Hábiles",
+        int(resumen_anterior["Dias_Habiles"].iloc[0])
+    )
+
+
 
 
 def color_total(valor):
@@ -304,44 +331,46 @@ def color_total(valor):
     else:
         return "background-color: #F8CBAD; color: black"
     
-st.subheader("Resumen Técnicos")
+st.subheader("Mes Actual")
 
 st.dataframe(
     resumen_actual[
         [
-        "Tecnico",
-        "VEHICULO",
-        "Asignadas",
-        "Completadas",
-        "Garantias",
-        "Falla_Joven",
-        "Nota_Falla_Joven",
-        "Productividad",
-        "Nota_Productividad",
-        "Efectividad",
-        "Nota_Efectividad",
-        "Asistencia",
-        "Nota_Asistencia",
-        "Total"
+            "Tecnico",
+            "VEHICULO",
+            "Asignadas",
+            "Completadas",
+            "Garantias",
+            "Falla_Joven",
+            "Nota_Falla_Joven",
+            "Productividad",
+            "Nota_Productividad",
+            "Efectividad",
+            "Nota_Efectividad",
+            "Asistencia",
+            "Nota_Asistencia",
+            "Total"
         ]
-  ].style.format(
-    {
+    ]
+    .style
+    .format({
         "Productividad": "{:.2f}",
         "Nota_Productividad": "{:.2f}",
         "Efectividad": "{:.2f}%",
         "Nota_Efectividad": "{:.2f}",
+        "Falla_Joven": "{:.2f}%",
         "Nota_Falla_Joven": "{:.2f}",
         "Asistencia": "{:.2f}%",
         "Nota_Asistencia": "{:.2f}",
-        "Falla_Joven": "{:.2f}%",
         "Total": "{:.2f}"
-    }
-).applymap(
-    color_total,
-    subset=["Total"]
-).set_properties(**{
-    "color": "#111111"
-}),
+    })
+    .applymap(
+        color_total,
+        subset=["Total"]
+    )
+    .set_properties(**{
+        "color": "#111111"
+    }),
     use_container_width=True,
     hide_index=True,
     column_config={
@@ -371,24 +400,26 @@ st.dataframe(
             "Nota_Asistencia",
             "Total"
         ]
-    ].style.format(
-        {
-            "Productividad": "{:.2f}",
-            "Nota_Productividad": "{:.2f}",
-            "Efectividad": "{:.2f}%",
-            "Nota_Efectividad": "{:.2f}",
-            "Nota_Falla_Joven": "{:.2f}",
-            "Asistencia": "{:.2f}%",
-            "Nota_Asistencia": "{:.2f}",
-            "Falla_Joven": "{:.2f}%",
-            "Total": "{:.2f}"
-        }
- ).applymap(
-    color_total,
-    subset=["Total"]
-).set_properties(**{
-    "color": "#111111"
-}),
+    ]
+    .style
+    .format({
+        "Productividad": "{:.2f}",
+        "Nota_Productividad": "{:.2f}",
+        "Efectividad": "{:.2f}%",
+        "Nota_Efectividad": "{:.2f}",
+        "Nota_Falla_Joven": "{:.2f}",
+        "Asistencia": "{:.2f}%",
+        "Nota_Asistencia": "{:.2f}",
+        "Falla_Joven": "{:.2f}%",
+        "Total": "{:.2f}"
+    })
+    .applymap(
+        color_total,
+        subset=["Total"]
+    )
+    .set_properties(**{
+        "color": "#111111"
+    }),
     use_container_width=True,
     hide_index=True,
     column_config={
@@ -443,9 +474,7 @@ def color_comparativo(valor):
     else:
         return "background-color: #FFEB9C; color: black"
 
-
-
-st.subheader("Comparativo")
+st.subheader("📈 Comparativo Mes Actual vs Mes Anterior")
 
 st.dataframe(
     comparativo[
@@ -464,18 +493,21 @@ st.dataframe(
         "Δ Efectividad": "{:.2f}",
         "Δ Falla_Joven": "{:.2f}",
         "Δ Asistencia": "{:.2f}",
-        "Δ Total": "{:.2f}",
+        "Δ Total": "{:.2f}"
     })
     .applymap(
-    color_comparativo,
-    subset=[
-        "Δ Productividad",
-        "Δ Efectividad",
-        "Δ Falla_Joven",
-        "Δ Asistencia",
-        "Δ Total"
-    ]
-),
+        color_comparativo,
+        subset=[
+            "Δ Productividad",
+            "Δ Efectividad",
+            "Δ Falla_Joven",
+            "Δ Asistencia",
+            "Δ Total"
+        ]
+    )
+    .set_properties(**{
+        "color": "#111111"
+    }),
     use_container_width=True,
     hide_index=True,
     column_config={
